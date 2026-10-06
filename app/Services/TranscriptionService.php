@@ -85,6 +85,7 @@ class TranscriptionService
                     'data' => base64_encode($bytes),
                 ],
             ]],
+            true,
         );
 
         if (! $response->successful()) {
@@ -94,8 +95,18 @@ class TranscriptionService
         }
 
         $text = OpenAiResponseReader::outputText($response->json() ?? []);
+        $decoded = json_decode($text, true);
+        $turns = [];
 
-        if ($text === '') {
+        if (is_array($decoded)) {
+            $turns = is_array($decoded['turns'] ?? null) ? $decoded['turns'] : (array_is_list($decoded) ? $decoded : []);
+        }
+
+        if ($turns !== []) {
+            return json_encode(['segments' => $turns], JSON_UNESCAPED_UNICODE) ?: $text;
+        }
+
+        if ($text === '' || str_starts_with(ltrim($text), '{')) {
             throw new RuntimeException('Speech-to-text returned an empty transcript.');
         }
 
@@ -129,15 +140,21 @@ class TranscriptionService
     private function geminiInstructions(): string
     {
         return <<<'TEXT'
-Listen to this Hindi phone call and write only the transcript.
+Listen to this phone call between a school and a parent.
+Return only JSON with this shape:
+{"turns":[{"speaker":"staff","text":"..."},{"speaker":"parent","text":"..."}]}
 
-Write it in Hinglish, using English letters, the way a person types on WhatsApp.
+speaker is staff, parent, or unknown.
+staff is the person calling from the school.
+parent is the person at home.
+Start a new turn every time the other person begins to speak.
+Write the words in Hinglish, using English letters, the way a person types on WhatsApp.
 Use normal spellings such as main, mein, tha, ji, October, December, kar dijiye, theek hai.
-Keep every number exactly as spoken. If the caller says 20, write 20. If the caller says 5 October, keep 5 October.
+Keep every number exactly as spoken.
 Do not invent words, names, or dates.
 If a word is unclear, leave it out instead of guessing.
-Do not turn the call into an English paragraph.
-Do not add a title or labels.
+If you cannot tell who is speaking, use unknown.
+Do not turn the call into one English paragraph.
 TEXT;
     }
 
@@ -146,7 +163,10 @@ TEXT;
      */
     private function storeTranscript(ProcessedCall $call, string $text): array
     {
-        $body = ['text' => $text];
+        $decoded = json_decode($text, true);
+        $body = is_array($decoded) && is_array($decoded['segments'] ?? null)
+            ? $decoded
+            : ['text' => $text];
         $segments = $this->segmentsFromPayload($body, (int) ($call->duration_seconds ?? 0));
 
         $call->segments()->delete();
@@ -206,12 +226,21 @@ TEXT;
                     continue;
                 }
 
-                $label = (string) ($row['speaker'] ?? 'speaker');
-                $speakers[$label] = $speakers[$label] ?? (count($speakers) + 1);
+                $label = strtolower(trim((string) ($row['speaker'] ?? $row['role'] ?? 'speaker')));
+                $known = match ($label) {
+                    'staff', 'agent', 'school', 'teacher', 'telecaller' => 'Staff',
+                    'parent', 'customer', 'guardian', 'father', 'mother' => 'Parent',
+                    default => null,
+                };
+
+                if ($known === null && ! isset($speakers[$label])) {
+                    $speakers[$label] = count($speakers) + 1;
+                }
+
                 $segments[] = [
                     'start' => round((float) ($row['start'] ?? 0), 2),
                     'end' => round((float) ($row['end'] ?? 0), 2),
-                    'speaker' => 'Speaker '.$speakers[$label],
+                    'speaker' => $known ?? ('Speaker '.$speakers[$label]),
                     'text' => $text,
                 ];
             }
