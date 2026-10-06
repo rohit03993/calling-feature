@@ -19,7 +19,6 @@ class GeminiClient
             throw new RuntimeException('The Gemini key is missing on the Call AI server.');
         }
 
-        $model = trim((string) config('call_ai.gemini_model'));
         $base = rtrim((string) config('call_ai.gemini_base_url'), '/');
         $generation = ['temperature' => 0];
 
@@ -27,9 +26,7 @@ class GeminiClient
             $generation['responseMimeType'] = 'application/json';
         }
 
-        return Http::withHeaders([
-            'X-goog-api-key' => $key,
-        ])->timeout(180)->post($base.'/models/'.$model.':generateContent', [
+        $body = [
             'systemInstruction' => [
                 'parts' => [
                     ['text' => $system],
@@ -41,6 +38,50 @@ class GeminiClient
                 ],
             ],
             'generationConfig' => $generation,
-        ]);
+        ];
+
+        $last = null;
+
+        foreach (self::models() as $model) {
+            $last = Http::withHeaders([
+                'X-goog-api-key' => $key,
+            ])->timeout(180)->post($base.'/models/'.$model.':generateContent', $body);
+
+            if ($last->successful() || ! in_array($last->status(), [404, 429, 500, 503], true)) {
+                return $last;
+            }
+        }
+
+        if (! $last instanceof Response) {
+            throw new RuntimeException('The Gemini model name is missing on the Call AI server.');
+        }
+
+        return $last;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function models(): array
+    {
+        $names = array_merge(
+            [trim((string) config('call_ai.gemini_model'))],
+            is_array(config('call_ai.gemini_fallbacks')) ? config('call_ai.gemini_fallbacks') : [],
+        );
+        $models = [];
+
+        foreach ($names as $name) {
+            $name = trim((string) $name);
+
+            if ($name !== '' && ! in_array($name, $models, true)) {
+                $models[] = $name;
+            }
+        }
+
+        if ($models === []) {
+            throw new RuntimeException('The Gemini model name is missing on the Call AI server.');
+        }
+
+        return $models;
     }
 }

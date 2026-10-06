@@ -12,6 +12,11 @@ return [
 
     'gemini_model' => env('GEMINI_MODEL', 'gemini-flash-latest'),
 
+    'gemini_fallbacks' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('GEMINI_FALLBACK_MODELS', 'gemini-2.5-flash,gemini-2.5-flash-lite,gemini-2.0-flash,gemini-2.0-flash-lite')),
+    ))),
+
     'gemini_base_url' => rtrim((string) env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'), '/'),
 
     'transcription_model' => env('CALL_AI_TRANSCRIBE_MODEL', 'gpt-4o-mini-transcribe'),
