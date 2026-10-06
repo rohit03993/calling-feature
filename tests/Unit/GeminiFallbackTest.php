@@ -14,12 +14,18 @@ class GeminiFallbackTest extends TestCase
         config([
             'call_ai.gemini_key' => 'test-key',
             'call_ai.gemini_model' => 'gemini-3-flash-preview',
-            'call_ai.gemini_fallbacks' => ['gemini-2.5-flash'],
+            'call_ai.gemini_fallbacks' => ['gemini-2.0-flash-lite'],
             'call_ai.gemini_base_url' => 'https://generativelanguage.googleapis.com/v1beta',
         ]);
 
         Http::fake(function ($request) {
-            if (str_contains($request->url(), 'gemini-3-flash-preview')) {
+            if (str_contains($request->url(), 'gemini-2.0') || str_contains($request->url(), 'gemini-3-flash-preview')) {
+                return Http::response([
+                    'error' => ['message' => 'This old model must not be called'],
+                ], 400);
+            }
+
+            if (str_contains($request->url(), 'gemini-2.5-flash-lite')) {
                 return Http::response([
                     'error' => ['message' => 'Quota exceeded'],
                 ], 429);
@@ -40,6 +46,10 @@ class GeminiFallbackTest extends TestCase
 
         $this->assertTrue($response->successful());
         $this->assertStringContainsString('staff', (string) $response->json('candidates.0.content.parts.0.text'));
+        Http::assertNotSent(function ($request) {
+            return str_contains($request->url(), 'gemini-2.0')
+                || str_contains($request->url(), 'gemini-3-flash-preview');
+        });
     }
 
     public function test_a_timed_out_model_is_skipped_and_the_next_model_is_used(): void
@@ -47,12 +57,12 @@ class GeminiFallbackTest extends TestCase
         config([
             'call_ai.gemini_key' => 'test-key',
             'call_ai.gemini_model' => 'gemini-3-flash-preview',
-            'call_ai.gemini_fallbacks' => ['gemini-2.5-flash'],
+            'call_ai.gemini_fallbacks' => ['gemini-2.0-flash-lite'],
             'call_ai.gemini_base_url' => 'https://generativelanguage.googleapis.com/v1beta',
         ]);
 
         Http::fake(function ($request) {
-            if (str_contains($request->url(), 'gemini-3-flash-preview')) {
+            if (str_contains($request->url(), 'gemini-2.5-flash-lite')) {
                 throw new ConnectionException('cURL error 28: Operation timed out after 180002 milliseconds with 0 bytes received');
             }
 

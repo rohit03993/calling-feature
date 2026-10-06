@@ -10,11 +10,11 @@ return [
 
     'gemini_key' => env('GEMINI_API_KEY'),
 
-    'gemini_model' => env('GEMINI_MODEL', 'gemini-flash-latest'),
+    'gemini_model' => env('GEMINI_MODEL', 'gemini-2.5-flash-lite'),
 
     'gemini_fallbacks' => array_values(array_filter(array_map(
         'trim',
-        explode(',', (string) env('GEMINI_FALLBACK_MODELS', 'gemini-2.5-flash,gemini-2.5-flash-lite,gemini-2.0-flash,gemini-2.0-flash-lite')),
+        explode(',', (string) env('GEMINI_FALLBACK_MODELS', 'gemini-2.5-flash,gemini-3.5-flash')),
     ))),
 
     'gemini_base_url' => rtrim((string) env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'), '/'),

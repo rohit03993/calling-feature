@@ -47,7 +47,7 @@ class GeminiClient
             try {
                 $last = Http::withHeaders([
                     'X-goog-api-key' => $key,
-                ])->connectTimeout(15)->timeout(90)->post($base.'/models/'.$model.':generateContent', $body);
+                ])->connectTimeout(8)->timeout(35)->post($base.'/models/'.$model.':generateContent', $body);
             } catch (ConnectionException) {
                 $lastProblem = 'Gemini did not answer in time.';
 
@@ -70,24 +70,10 @@ class GeminiClient
      */
     private static function models(): array
     {
-        $names = array_merge(
-            [trim((string) config('call_ai.gemini_model'))],
-            is_array(config('call_ai.gemini_fallbacks')) ? config('call_ai.gemini_fallbacks') : [],
-        );
-        $models = [];
-
-        foreach ($names as $name) {
-            $name = trim((string) $name);
-
-            if ($name !== '' && ! in_array($name, $models, true)) {
-                $models[] = $name;
-            }
-        }
-
-        if ($models === []) {
-            throw new RuntimeException('The Gemini model name is missing on the Call AI server.');
-        }
-
-        return $models;
+        return [
+            'gemini-2.5-flash-lite',
+            'gemini-2.5-flash',
+            'gemini-3.5-flash',
+        ];
     }
 }
