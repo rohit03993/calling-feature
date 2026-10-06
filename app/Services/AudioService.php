@@ -49,7 +49,7 @@ class AudioService
         }
 
         $extension = strtolower(pathinfo($key, PATHINFO_EXTENSION));
-        $allowed = ['m4a', 'mp3', 'wav', 'aac', 'ogg', 'webm', 'mp4'];
+        $allowed = ['m4a', 'mp3', 'wav', 'aac', 'ogg', 'webm', 'mp4', 'm4v', '3gp', 'amr'];
 
         if (! in_array($extension, $allowed, true)) {
             throw new RuntimeException('This audio type is not supported.');

@@ -16,7 +16,7 @@ class AuthenticateSchool
         $school = School::query()->where('code', $code)->where('enabled', true)->first();
 
         if ($school === null || $token === '' || ! hash_equals((string) $school->secret, $token)) {
-            return response()->json(['message' => 'Unauthorized'], 401);
+            return response()->json(['message' => 'School code or secret does not match.'], 401);
         }
 
         $request->attributes->set('school', $school);
