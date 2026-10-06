@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -40,23 +41,28 @@ class GeminiClient
             'generationConfig' => $generation,
         ];
 
-        $last = null;
+        $lastProblem = 'Gemini did not answer.';
 
         foreach (self::models() as $model) {
-            $last = Http::withHeaders([
-                'X-goog-api-key' => $key,
-            ])->timeout(180)->post($base.'/models/'.$model.':generateContent', $body);
+            try {
+                $last = Http::withHeaders([
+                    'X-goog-api-key' => $key,
+                ])->connectTimeout(15)->timeout(90)->post($base.'/models/'.$model.':generateContent', $body);
+            } catch (ConnectionException) {
+                $lastProblem = 'Gemini did not answer in time.';
+
+                continue;
+            }
 
             if ($last->successful() || ! in_array($last->status(), [404, 429, 500, 503], true)) {
                 return $last;
             }
+
+            $detail = trim((string) $last->json('error.message'));
+            $lastProblem = $detail !== '' ? $detail : 'Gemini refused this model.';
         }
 
-        if (! $last instanceof Response) {
-            throw new RuntimeException('The Gemini model name is missing on the Call AI server.');
-        }
-
-        return $last;
+        throw new RuntimeException($lastProblem);
     }
 
     /**
