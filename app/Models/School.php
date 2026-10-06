@@ -32,4 +32,28 @@ class School extends Model
     {
         return $this->hasMany(ProcessedCall::class);
     }
+
+    public static function syncFromConfig(): void
+    {
+        $code = (string) config('call_ai.school_code');
+        $secret = (string) config('call_ai.school_secret');
+
+        if ($code === '' || $secret === '') {
+            return;
+        }
+
+        $callbackUrl = (string) config('call_ai.school_callback_url');
+        $callbackSecret = (string) config('call_ai.school_callback_secret');
+
+        static::query()->updateOrCreate(
+            ['code' => $code],
+            [
+                'name' => $code,
+                'secret' => $secret,
+                'callback_url' => $callbackUrl !== '' ? $callbackUrl : null,
+                'callback_secret' => $callbackSecret !== '' ? $callbackSecret : null,
+                'enabled' => true,
+            ],
+        );
+    }
 }

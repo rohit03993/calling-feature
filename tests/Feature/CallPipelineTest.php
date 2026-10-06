@@ -129,4 +129,39 @@ class CallPipelineTest extends TestCase
 
         $this->assertTrue($other->exists());
     }
+
+    public function test_school_from_the_env_file_is_saved_and_accepted(): void
+    {
+        config([
+            'call_ai.school_code' => '@horizon',
+            'call_ai.school_secret' => '@school-secret',
+            'call_ai.school_callback_url' => 'https://horizon.example/api/call-intelligence/result',
+            'call_ai.school_callback_secret' => '@callback-secret',
+        ]);
+
+        School::query()->create([
+            'code' => 'local',
+            'name' => 'local',
+            'secret' => 'old-secret',
+            'enabled' => true,
+        ]);
+
+        $callId = (string) Str::uuid();
+
+        $this->postJson('/api/calls', ['call_id' => $callId], [
+            'Authorization' => 'Bearer @school-secret',
+            'X-School-Code' => '@horizon',
+        ])->assertCreated();
+
+        $school = School::query()->where('code', '@horizon')->first();
+        $this->assertNotNull($school);
+        $this->assertSame('@school-secret', $school->secret);
+        $this->assertSame('https://horizon.example/api/call-intelligence/result', $school->callback_url);
+        $this->assertSame('@callback-secret', $school->callback_secret);
+
+        $this->postJson('/api/calls', ['call_id' => (string) Str::uuid()], [
+            'Authorization' => 'Bearer old-secret',
+            'X-School-Code' => '@horizon',
+        ])->assertUnauthorized();
+    }
 }

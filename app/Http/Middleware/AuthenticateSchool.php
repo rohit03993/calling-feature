@@ -11,6 +11,8 @@ class AuthenticateSchool
 {
     public function handle(Request $request, Closure $next): Response
     {
+        School::syncFromConfig();
+
         $code = (string) $request->header('X-School-Code');
         $token = (string) $request->bearerToken();
         $school = School::query()->where('code', $code)->where('enabled', true)->first();
